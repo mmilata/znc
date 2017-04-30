@@ -44,17 +44,6 @@ using std::list;
 
 #define PROTOCOL_ID "irc"
 
-/* Due to a bug in libotr-4.0.0, passing OTRL_FRAGMENT_SEND_ALL does not work
- * because otrInjectMessage callback receives NULL as opdata. This workaround
- * passes the pointer to the COtrMod instance in a global variable. The bug was
- * fixed in d748757 thus the workaround shouldn't be needed in libotr > 4.0.0.
- */
-#if (OTRL_VERSION_MAJOR == 4 && OTRL_VERSION_MINOR == 0 && \
-     OTRL_VERSION_SUB == 0)
-#define INJECT_WORKAROUND_NEEDED
-#endif
-void* inject_workaround_mod;
-
 class COtrGenKeyJob : public CModuleJob {
   public:
     COtrGenKeyJob(CModule* pModule)
@@ -756,12 +745,10 @@ class COtrMod : public CModule {
         const char* accountname = GetUser()->GetUserName().c_str();
         CString sNick = sTarget.AsLower();
 
-        inject_workaround_mod = this;
         err = otrl_message_sending(
             m_pUserState, &m_xOtrOps, this, accountname, PROTOCOL_ID,
             sNick.c_str(), OTRL_INSTAG_BEST, sMessage.c_str(), NULL,
             &newmessage, OTRL_FRAGMENT_SEND_ALL, NULL, COtrAppData::Add, NULL);
-        inject_workaround_mod = NULL;
 
         if (err) {
             PutModuleBuffered(CString("otrl_message_sending failed: ") +
@@ -896,9 +883,6 @@ class COtrMod : public CModule {
     static void otrInjectMessage(void* opdata, const char* accountname,
                                  const char* protocol, const char* recipient,
                                  const char* message) {
-#ifdef INJECT_WORKAROUND_NEEDED
-        opdata = (opdata ? opdata : inject_workaround_mod);
-#endif
         COtrMod* mod = static_cast<COtrMod*>(opdata);
         assert(mod);
         assert(0 == strcmp(protocol, PROTOCOL_ID));

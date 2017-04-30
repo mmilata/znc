@@ -118,33 +118,33 @@ class COtrMod : public CModule {
 
     enum Color { Blue = 2, Green = 3, Red = 4, Bold = 32 };
 
-    CString Clr(Color eClr, const CString& sWhat) {
+    static CString Clr(Color eClr, const CString& sWhat) {
         if (eClr == Bold) {
-            return CString("\x02") + sWhat + CString("\x02");
+            return "\x02" + sWhat + "\x02";
         } else {
-            return CString("\x03") + CString(eClr) + sWhat + CString("\x03");
+            return "\x03" + eClr + sWhat + "\x03";
         }
     }
 
     static CString HumanFingerprint(Fingerprint* fprint) {
         char human[OTRL_PRIVKEY_FPRINT_HUMAN_LEN];
         otrl_privkey_hash_to_human(human, fprint->fingerprint);
-        return CString(human);
+        return human;
     }
 
     CString OurFingerprint() {
         char ourfp[OTRL_PRIVKEY_FPRINT_HUMAN_LEN];
-        const char* accountname = GetUser()->GetUserName().c_str();
-        if (otrl_privkey_fingerprint(m_pUserState, ourfp, accountname,
+        CString accountname = GetUser()->GetUserName();
+        if (otrl_privkey_fingerprint(m_pUserState, ourfp, accountname.c_str(),
                                      PROTOCOL_ID)) {
-            return CString(ourfp);
+            return ourfp;
         }
-        return CString("ERROR");
+        return "ERROR";
     }
 
     void WriteFingerprints() {
-        gcry_error_t err;
-        err = otrl_privkey_write_fingerprints(m_pUserState, m_sFPPath.c_str());
+        gcry_error_t err = otrl_privkey_write_fingerprints(m_pUserState,
+                                                           m_sFPPath.c_str());
         if (err) {
             PutModuleBuffered(CString("Failed to write fingerprints: ") +
                               gcry_strerror(err));
@@ -194,16 +194,24 @@ class COtrMod : public CModule {
             assert(ctx->username);
             ConnContext* best_ctx = otrl_context_find(
                 m_pUserState, ctx->username, GetUser()->GetUserName().c_str(),
-                PROTOCOL_ID, OTRL_INSTAG_BEST, 0, NULL, NULL, NULL);
+                PROTOCOL_ID, OTRL_INSTAG_BEST, 0, nullptr, nullptr, nullptr);
             if (!best_ctx) continue;
-            const char* state =
-                (best_ctx->msgstate == OTRL_MSGSTATE_PLAINTEXT
-                     ? "plaintext"
-                     : (best_ctx->msgstate == OTRL_MSGSTATE_ENCRYPTED
-                            ? "encrypted"
-                            : (best_ctx->msgstate == OTRL_MSGSTATE_FINISHED
-                                   ? "finished"
-                                   : "unknown")));
+
+            CString state;
+            switch (best_ctx->msgstate) {
+            case OTRL_MSGSTATE_PLAINTEXT:
+                state = "plaintext";
+                break;
+            case OTRL_MSGSTATE_ENCRYPTED:
+                state = "encrypted";
+                break;
+            case OTRL_MSGSTATE_FINISHED:
+                state = "finished";
+                break;
+            default:
+                state = "unknown";
+                break;
+            }
 
             Fingerprint* fp;
             for (fp = ctx->fingerprint_root.next; fp; fp = fp->next) {
@@ -339,7 +347,7 @@ class COtrMod : public CModule {
 
     void DoSMP(ConnContext* ctx, const CString& sQuestion,
                const CString& sSecret) {
-        if (sSecret.Equals("")) {
+        if (sSecret.empty()) {
             PutModuleContext(ctx, "No secret given!");
             return;
         }
@@ -359,7 +367,7 @@ class COtrMod : public CModule {
                 sSecret.length());
             PutModuleContext(ctx, "Responded to authentication.");
         } else {
-            if (sQuestion.Equals("")) {
+            if (sQuestion.empty()) {
                 otrl_message_initiate_smp(
                     m_pUserState, &m_xOtrOps, this, ctx,
                     reinterpret_cast<const unsigned char*>(sSecret.c_str()),
@@ -480,9 +488,8 @@ class COtrMod : public CModule {
             return;
         }
 
-        gcry_error_t err;
-        err = otrl_privkey_generate_start(m_pUserState, accountname,
-                                          PROTOCOL_ID, &m_NewKey);
+        gcry_error_t err = otrl_privkey_generate_start(
+            m_pUserState, accountname, PROTOCOL_ID, &m_NewKey);
         if (err) {
             PutModuleBuffered(CString("Key generation failed: ") +
                               gcry_strerror(err));
@@ -495,27 +502,15 @@ class COtrMod : public CModule {
     }
 
     void SaveIgnores() {
-        CString sFlat = "";
-        bool bFirst = true;
-
-        for (VCString::const_iterator it = m_vsIgnored.begin();
-             it != m_vsIgnored.end(); it++) {
-            if (bFirst) {
-                bFirst = false;
-            } else {
-                sFlat += " ";
-            }
-            sFlat += *it;
-        }
+        CString sFlat = CString(" ").Join(m_vsIgnored.begin(), m_vsIgnored.end());
         SetNV("ignore", sFlat, true);
     }
 
     bool IsIgnored(const CString& sNick) {
         CString sNickLower = sNick.AsLower();
 
-        for (VCString::const_iterator it = m_vsIgnored.begin();
-             it != m_vsIgnored.end(); it++) {
-            if (sNickLower.WildCmp(*it)) {
+        for (const CString& s : m_vsIgnored) {
+            if (sNickLower.WildCmp(s)) {
                 return true;
             }
         }
@@ -523,21 +518,20 @@ class COtrMod : public CModule {
     }
 
     void CmdIgnore(const CString& sLine) {
-        if (sLine.Token(1).Equals("")) {
+        if (sLine.Token(1).empty()) {
             PutModuleBuffered("OTR is disabled for following nicks:");
-            for (VCString::const_iterator it = m_vsIgnored.begin();
-                 it != m_vsIgnored.end(); it++) {
-                PutModuleBuffered(*it);
+            for (const CString& s : m_vsIgnored) {
+                PutModuleBuffered(s);
             }
         } else if (sLine.Token(1).Equals("--remove")) {
             CString sNick = sLine.Token(2);
-            if (sNick.Equals("")) {
+            if (sNick.empty()) {
                 PutModuleBuffered("Usage: ignore --remove nick");
                 return;
             }
 
             bool bFound = false;
-            for (VCString::iterator it = m_vsIgnored.begin();
+            for (VCString::iterator it = m_vsIgnored.begin(); //range-based for
                  it != m_vsIgnored.end(); it++) {
                 if (it->Equals(sNick)) {
                     m_vsIgnored.erase(it);
@@ -564,8 +558,8 @@ class COtrMod : public CModule {
 
     bool OnLoad(const CString& sArgs, CString& sMessage) override {
         // Initialize libgcrypt for multithreaded usage
-        gcry_error_t err;
-        err = gcry_control(GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
+        gcry_error_t err = gcry_control(GCRYCTL_SET_THREAD_CBS,
+                                        &gcry_threads_pthread);
         if (err) {
             sMessage = (CString("Failed to initialize gcrypt threading: ") +
                         gcry_strerror(err));
@@ -834,8 +828,7 @@ class COtrMod : public CModule {
             otrl_message_free(newmessage);
 
             // Handle /me as sent by irssi and weechat plugins
-            if (sMessage.Left(4) == "/me ") {
-                sMessage.LeftChomp(4);
+            if (sMessage.TrimPrefix("/me ")) {
                 sMessage = "\001ACTION " + sMessage + "\001";
             }
 

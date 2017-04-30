@@ -58,16 +58,13 @@ class COtrTimer : public CTimer {
     COtrTimer(CModule* pModule, unsigned int uInterval)
         : CTimer(pModule, uInterval, /*run forever*/ 0, "OtrTimer",
                  "OTR message poll") {}
-    virtual ~COtrTimer() {}
 
   protected:
-    virtual void RunJob();
+    void RunJob() override;
 };
 
 struct COtrAppData {
-    bool bSmpReply;
-
-    COtrAppData() { bSmpReply = false; }
+    bool bSmpReply = false;
 
     static void Add(void* data, ConnContext* context) {
         context->app_data = new COtrAppData();
@@ -565,7 +562,7 @@ class COtrMod : public CModule {
         }
     }
 
-    virtual bool OnLoad(const CString& sArgs, CString& sMessage) {
+    bool OnLoad(const CString& sArgs, CString& sMessage) override {
         // Initialize libgcrypt for multithreaded usage
         gcry_error_t err;
         err = gcry_control(GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
@@ -671,10 +668,9 @@ class COtrMod : public CModule {
         // Load list of ignored nicks
         GetNV("ignore").Split(" ", m_vsIgnored, false);
 
-        // Warn if we are not an administrator
-        // We should check if we are the only administrator but the user map may
-        // not be
-        // fully populated at this time.
+        // Warn if we are not an administrator - we should check if we are the
+        // only administrator. However, the user map may not be fully populated
+        // at this time.
         if (!GetUser()->IsAdmin()) {
             PutModuleBuffered(
                 Clr(Red, "WARNING:") +
@@ -690,7 +686,7 @@ class COtrMod : public CModule {
         return true;
     }
 
-    virtual ~COtrMod() {
+    ~COtrMod() override {
         // No need to deactivate timers, they are removed in
         // CModule::~CModule().
         if (m_pUserState) otrl_userstate_free(m_pUserState);
@@ -766,7 +762,7 @@ class COtrMod : public CModule {
         }
     }
 
-    virtual EModRet OnUserMsg(CString& sTarget, CString& sMessage) {
+    EModRet OnUserMsg(CString& sTarget, CString& sMessage) override {
         // Do not pass the message to libotr if sTarget is a channel
         if (TargetIsChan(sTarget) || IsIgnored(sTarget)) {
             return CONTINUE;
@@ -775,7 +771,7 @@ class COtrMod : public CModule {
         return SendEncrypted(sTarget, sMessage);
     }
 
-    virtual EModRet OnUserAction(CString& sTarget, CString& sMessage) {
+    EModRet OnUserAction(CString& sTarget, CString& sMessage) override {
         if (TargetIsChan(sTarget) || IsIgnored(sTarget)) {
             return CONTINUE;
         }
@@ -791,7 +787,7 @@ class COtrMod : public CModule {
         return SendEncrypted(sTarget, sLine);
     }
 
-    virtual EModRet OnPrivMsg(CNick& Nick, CString& sMessage) {
+    EModRet OnPrivMsg(CNick& Nick, CString& sMessage) override {
         int res;
         char* newmessage = NULL;
         OtrlTLV* tlvs = NULL;
@@ -847,7 +843,7 @@ class COtrMod : public CModule {
         }
     }
 
-    virtual void OnClientLogin() {
+    void OnClientLogin() override {
         for (list<CString>::iterator it = m_Buffer.begin();
              it != m_Buffer.end(); it++) {
             PutModule(*it);

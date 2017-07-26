@@ -81,7 +81,7 @@ class COtrMod : public CModule {
     friend class COtrGenKeyJob;
 
   private:
-    static OtrlMessageAppOps m_xOtrOps;
+    static const OtrlMessageAppOps m_xOtrOps;
     OtrlUserState m_pUserState;
     CString m_sPrivkeyPath;
     CString m_sFPPath;
@@ -1183,41 +1183,35 @@ class COtrMod : public CModule {
         }
     }
 
-    static OtrlMessageAppOps InitOps() {
-        OtrlMessageAppOps ops;
-
-        ops.policy = otrPolicy;
-        ops.create_privkey = otrCreatePrivkey;
-        ops.is_logged_in = otrIsLoggedIn;
-        ops.inject_message = otrInjectMessage;
-        ops.update_context_list = NULL;  // do nothing
-        ops.new_fingerprint = NULL;      // do nothing
-        ops.write_fingerprints = otrWriteFingerprints;
-        ops.gone_secure = otrGoneSecure;
-        ops.gone_insecure = otrGoneInsecure;
-        ops.still_secure = otrStillSecure;
-        ops.max_message_size = otrMaxMessageSize;
-        ops.account_name = NULL;  // unused, deprecated
-        ops.account_name_free = NULL;
-        ops.received_symkey = otrReceiveSymkey;
-        ops.otr_error_message = otrErrorMessage;
-        ops.otr_error_message_free = otrFreeStringNop;
-        ops.resent_msg_prefix = NULL;  // uses [resent] by default
-        ops.resent_msg_prefix_free = NULL;
-        ops.handle_smp_event = otrHandleSMPEvent;
-        ops.handle_msg_event = otrHandleMsgEvent;
-        ops.create_instag = otrCreateInsTag;
-        ops.convert_msg = NULL;  // no conversion
-        ops.convert_free = NULL;
-        ops.timer_control = otrTimerControl;
-
-        return ops;
-    }
-
     // end of callbacks
 };
 
-OtrlMessageAppOps COtrMod::m_xOtrOps = COtrMod::InitOps();
+const OtrlMessageAppOps COtrMod::m_xOtrOps = (OtrlMessageAppOps){
+    .policy                 = otrPolicy,
+    .create_privkey         = otrCreatePrivkey,
+    .is_logged_in           = otrIsLoggedIn,
+    .inject_message         = otrInjectMessage,
+    .update_context_list    = nullptr, // do nothing
+    .new_fingerprint        = nullptr, // do nothing
+    .write_fingerprints     = otrWriteFingerprints,
+    .gone_secure            = otrGoneSecure,
+    .gone_insecure          = otrGoneInsecure,
+    .still_secure           = otrStillSecure,
+    .max_message_size       = otrMaxMessageSize,
+    .account_name           = nullptr, // unused, deprecated
+    .account_name_free      = nullptr,
+    .received_symkey        = otrReceiveSymkey,
+    .otr_error_message      = otrErrorMessage,
+    .otr_error_message_free = otrFreeStringNop,
+    .resent_msg_prefix      = nullptr, // uses [resent] by default
+    .resent_msg_prefix_free = nullptr,
+    .handle_smp_event       = otrHandleSMPEvent,
+    .handle_msg_event       = otrHandleMsgEvent,
+    .create_instag          = otrCreateInsTag,
+    .convert_msg            = nullptr, // no conversion
+    .convert_free           = nullptr,
+    .timer_control          = otrTimerControl,
+};
 
 template <>
 void TModInfo<COtrMod>(CModInfo& Info) {
